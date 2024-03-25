@@ -1,5 +1,5 @@
-// @ts-nocheck
 /* eslint-disable n8n-nodes-base/node-filename-against-convention */
+// @ts-nocheck
 import DDPClient from 'simpleddp';
 import ws from 'ws';
 import {
