@@ -94,17 +94,33 @@ export class DDPClientNode implements INodeType {
 		const client = new DDPClient({
 			endpoint: endpoint.toString(),
 			SocketConstructor: ws,
-			reconnectInterval: 5000,
+			autoConnect: false,
+			autoReconnect: false,
 		});
+		const connect = async () =>
+			new Promise(async (resolve, reject) => {
+				const timeout = setTimeout(() => {
+					const err = new Error('Connection timeout');
+					console.warn(`DDP Client "${name}" connection timeout`);
+					this.emitError(err);
+					reject(err);
+				}, 60000);
+				console.info(`DDP Client "${name}" connecting`);
+				// Implying that this will never throw error
+				await client.connect();
+				clearTimeout(timeout);
+				resolve();
+			});
 		client.on('connected', () => {
 			console.info(`DDP Client "${name}" connected`);
 		});
 		client.on('disconnected', () => {
 			console.info(`DDP Client "${name}" disconnected`);
+			setTimeout(connect, 5000);
 		});
 		client.on('error', (err: Error) => {
 			console.error(`DDP Client "${name}" error`, err);
-			// this.emitError(err);
+			this.emitError(err);
 		});
 		client.ddpConnection.socket.on('message:in', (data: any) => {
 			console.debug('WebSocket message', data);
@@ -122,6 +138,9 @@ export class DDPClientNode implements INodeType {
 					});
 			}
 		}
+		// Wait for initial connection
+		// Disallow workflow activation in case of error
+		await connect();
 		return {
 			closeFunction: () => client.disconnect(),
 			manualTriggerFunction: async () => {
