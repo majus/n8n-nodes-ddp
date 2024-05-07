@@ -97,29 +97,14 @@ export class DDPClientNode implements INodeType {
 			autoConnect: false,
 			autoReconnect: false,
 		});
-		const connect = async () =>
-			new Promise(async (resolve, reject) => {
-				const timeout = setTimeout(() => {
-					const err = new Error('Connection timeout');
-					console.warn(`DDP Client "${name}" connection timeout`);
-					this.emitError(err);
-					reject(err);
-				}, 60000);
-				console.info(`DDP Client "${name}" connecting`);
-				// Implying that this will never throw error
-				await client.connect();
-				clearTimeout(timeout);
-				resolve();
-			});
 		client.on('connected', () => {
-			console.info(`DDP Client "${name}" connected`);
+			console.info(`"${name}" connected`);
 		});
-		client.on('disconnected', () => {
-			console.info(`DDP Client "${name}" disconnected`);
-			setTimeout(connect, 5000);
+		const reconnector = client.on('disconnected', () => {
+			const err = new Error('Connection lost');
+			this.emitError(err);
 		});
 		client.on('error', (err: Error) => {
-			console.error(`DDP Client "${name}" error`, err);
 			this.emitError(err);
 		});
 		client.ddpConnection.socket.on('message:in', (data: any) => {
@@ -138,11 +123,19 @@ export class DDPClientNode implements INodeType {
 					});
 			}
 		}
-		// Wait for initial connection
-		// Disallow workflow activation in case of error
-		await connect();
+		// Initiate connection
+		const timeout = setTimeout(() => {
+			const err = new Error('Connection timeout');
+			this.emitError(err);
+		}, 5 * 60 * 1000);
+		// Implying that this will never throw error
+		client.connect().then(() => clearTimeout(timeout));
 		return {
-			closeFunction: () => client.disconnect(),
+			closeFunction() {
+				// Prevent from reconnecting
+				reconnector.stop();
+				client.disconnect();
+			},
 			manualTriggerFunction: async () => {
 				if (collections.items) {
 					// Wait for all subscriptions to be ready
