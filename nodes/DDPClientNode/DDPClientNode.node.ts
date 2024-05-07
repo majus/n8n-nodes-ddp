@@ -14,13 +14,16 @@ export class DDPClientNode implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'DDP Client',
 		name: 'ddpClient',
+		// eslint-disable-next-line n8n-nodes-base/node-class-description-icon-not-svg
+		icon: 'file:DDPClientNode.png',
 		group: ['trigger'],
 		version: 1,
 		description: 'Establishes connection to DDP server',
 		defaults: {
 			name: 'DDP client',
 		},
-		inputs: ['main'],
+		// eslint-disable-next-line n8n-nodes-base/node-class-description-inputs-wrong-regular-node
+		inputs: [],
 		outputs: ['main'],
 		properties: [
 			{
@@ -86,7 +89,7 @@ export class DDPClientNode implements INodeType {
 		const subscriptions = this.getNodeParameter('subscriptions', {}) as IDataObject;
 		const collections = this.getNodeParameter('collections', {}) as IDataObject;
 		const endpoint = new URL(this.getNodeParameter('url') as string);
-		endpoint.protocol = 'websocket';
+		endpoint.protocol = 'wss';
 		endpoint.pathname = '/websocket';
 		const client = new DDPClient({
 			endpoint: endpoint.toString(),
@@ -94,18 +97,18 @@ export class DDPClientNode implements INodeType {
 			reconnectInterval: 5000,
 		});
 		client.on('connected', () => {
-			console.log(`DDP Client "${name}" connected`);
+			console.info(`DDP Client "${name}" connected`);
 		});
 		client.on('disconnected', () => {
-			console.log(`DDP Client "${name}" disconnected`);
+			console.info(`DDP Client "${name}" disconnected`);
 		});
-		client.on('error', (error: Error) => {
-			console.log(`DDP Client "${name}" error`, error);
+		client.on('error', (err: Error) => {
+			console.error(`DDP Client "${name}" error`, err);
+			// this.emitError(err);
 		});
-		client.ddpConnection.socket.on('message', (data: any) => {
+		client.ddpConnection.socket.on('message:in', (data: any) => {
 			console.debug('WebSocket message', data);
 		});
-		await client.connect();
 		// Subscriptions
 		const subs = subscriptions.items?.map(({ name }) => client.subscribe(name)) ?? [];
 		// Collections
